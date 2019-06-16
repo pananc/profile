@@ -1,0 +1,74 @@
+#!/usr/bin/python
+
+import os
+import string
+import socket
+import sys
+
+LOCAL_IP = socket.gethostbyname(socket.gethostname())
+
+SCRIPTS_DIR = os.getenv("HOME") + "/Scripts"
+
+SCP_EXP = SCRIPTS_DIR + "/scp.exp "
+SSH_EXP = SCRIPTS_DIR + "/ssh.exp "
+
+hostfile = "host.list"
+pathname = "~/.profile"
+if (len(sys.argv) == 2):
+    hostfile = sys.argv[1]
+elif (len(sys.argv) >= 3):
+    hostfile = sys.argv[1]
+    pathname = sys.argv[2]
+
+if (os.path.isfile(hostfile)):
+    hostfile = os.path.abspath(hostfile)
+else:
+    print "Unknown host file " + hostfile
+    sys.exit(1)
+
+cmd = "cat " + hostfile
+hosts = os.popen(cmd).read()
+lines = string.split(hosts, "\n")
+
+print "Current working directory is " + os.path.abspath(os.path.curdir)
+
+for line in lines:
+    items = string.split(line)
+    if len(items) != 3:
+        continue
+    
+    ip = items[0]
+    username = items[1]
+    password = items[2]
+    
+    if ip == LOCAL_IP:
+        continue
+
+    print "Deploy " + pathname + " to machine " + ip
+    basename = os.path.basename(pathname)
+    fullname = os.path.abspath(pathname)
+    dirname = os.path.dirname(fullname)
+    if os.path.isfile(pathname):
+        cmd = SCP_EXP
+        cmd += fullname + " " + username + "@" + ip + ":" + dirname + " "
+        cmd += password
+        os.system(cmd)
+    elif os.path.isdir(pathname):
+        cmd = "cd " + dirname + ";tar czf " + basename + ".tar.gz ./" + basename
+        os.system(cmd)
+            
+        cmd = SCP_EXP
+        cmd += fullname + ".tar.gz " + username + "@" + ip + ":" + dirname + " "
+        cmd += password
+        os.system(cmd)
+           
+        cmd = SSH_EXP
+        cmd += ip + " " + username + " " + password + " "
+        cmd += "\"cd " + dirname + "; rm -rf " + basename + ";tar zxf " + basename + ".tar.gz;"
+        cmd += "rm -rf " + basename + ".tar.gz\""
+        os.system(cmd)
+           
+        cmd = "rm -f " + fullname + ".tar.gz"
+        os.system(cmd)
+    else:
+        print "Unknown directory or file name " + pathname
