@@ -1,0 +1,349 @@
+#!/usr/bin/python
+
+# This script is used to parse mysql undo log records.
+# Author: Nicole Nie (2017/11/22)
+#
+# Usage: ./parsemysqlundo <data_dir> [, <out_dir>]
+#
+# Note:
+# 1. The data_dir should be the path to the Taurus/MySQL data directory
+# 2. The out_dir is current dir if not defined
+
+import os
+import struct
+import sys
+
+# Predefined constants.
+UNIV_PAGE_SIZE = 16384
+FSP_TRX_SYS_PAGE_NO = 5 # transaction system header, in tablespace 0
+
+FIL_PAGE_DATA = 38
+
+# The low 4 bytes of this are used to store the page checksum, the last 4 bytes
+# should be identical to the last 4 bytes of FIL_PAGE_LSN
+FIL_PAGE_END_LSN_OLD_CHKSUM = 8
+FIL_PAGE_DATA_END = 8
+
+# The offset of the doublewrite buffer header on the trx system header page
+TRX_SYS_DOUBLEWRITE = (UNIV_PAGE_SIZE - 200)
+
+TRX_SYS_DOUBLEWRITE_MAGIC_N = 536853855
+
+TRX_SYS_N_RSEGS = 128
+TRX_SYS_OLD_N_RSEGS = 256
+
+TRX_RSEG_N_SLOTS = 1024
+XIDDATASIZE = 128
+
+TRX_UNDO_INSERT_REC = 11 # fresh insert into clustered index
+TRX_UNDO_UPD_EXIST_REC = 12 # update of a non-delete-marked record
+TRX_UNDO_UPD_DEL_REC = 13 # update of a delete marked record to a not delete marked record; also the fields of the record can change
+TRX_UNDO_DEL_MARK_REC = 14 # delete marking of a record; fields do not change
+
+def mach_read_from_1(fp):
+    c0, = struct.unpack('B', fp.read(1))
+    return (c0)
+
+def mach_read_from_2(fp):
+    c0,c1 = struct.unpack('BB', fp.read(2))
+    return (c0<<8) + (c1)
+
+def mach_read_from_4(fp):
+    c0,c1,c2,c3 = struct.unpack('BBBB', fp.read(4))
+    # print ("{0:d} {1:d} {2:d} {3:d}".format(c0, c1, c2, c3)),
+    return (c0<<24) + (c1<<16) + (c2<<8) + (c3)
+
+def mach_read_from_8(fp):
+    c0,c1,c2,c3,c4,c5,c6,c7 = struct.unpack('BBBBBBBB', fp.read(8))
+    return (c0<<56) + (c1<<48) + (c2<<40) + (c3<<32) + (c4<<24) + (c5<<16) + (c6<<8) + (c7)
+
+def hex_print_from_n(bin_fp, report_fp, n):
+    cnt = 0
+    while cnt < n:
+        c, = struct.unpack('B', bin_fp.read(1))
+        print >> report_fp, ("{0:02X}".format(c)),
+        cnt = cnt + 1
+    print >> report_fp
+
+def print_fil_header(bin_fp, report_fp):
+    print >> report_fp, "FIL_PAGE_CHKSUM:",
+    hex_print_from_n(bin_fp, report_fp, 4)
+    print >> report_fp, "FIL_PAGE_OFFSET:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "FIL_PAGE_PREV:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "FIL_PAGE_NEXT:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "FIL_PAGE_LSN:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    print >> report_fp, "FIL_PAGE_TYPE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "FIL_PAGE_FILE_FLUSH_LSN:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    print >> report_fp, "FIL_PAGE_SPACE_ID:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+
+def print_fil_tailer(bin_fp, report_fp):
+    print >> report_fp, "FIL_PAGE_END_LSN_OLD_CHKSUM:",
+    hex_print_from_n(bin_fp, report_fp, 8)
+
+trx_sys_rsegs = []
+def print_trx_system_page(bin_fp, report_fp):
+    offset = bin_fp.tell()
+    print_fil_header(bin_fp, report_fp)
+    print >> report_fp, "TRX_SYS_TRX_ID_STORE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    print >> report_fp, "TRX_SYS_FSEG_HEADER:",
+    print >> report_fp, ("({0:d}, {1:d}, {2:d})".format(mach_read_from_4(bin_fp), mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    cnt = 0
+    while cnt < TRX_SYS_N_RSEGS:
+        print >> report_fp, "TRX_SYS_RSEGS[" + str(cnt) + "]:",
+        space = mach_read_from_4(bin_fp)
+        page_no = mach_read_from_4(bin_fp)
+        print >> report_fp, ("({0:d}, {1:d})".format(space, page_no))
+        trx_sys_rsegs.append((space, page_no))
+        cnt = cnt + 1
+    bin_fp.seek(offset + TRX_SYS_DOUBLEWRITE)
+    print >> report_fp, "TRX_SYS_DOUBLEWRITE_FSEG (SPACE, PAGE_NO, OFFSET):",
+    print >> report_fp, ("({0:d}, {1:d}, {2:d})".format(mach_read_from_4(bin_fp), mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_SYS_DOUBLEWRITE_MAGIC:",
+    trx_sys_doublewrite_magic_n = mach_read_from_4(bin_fp)
+    print >> report_fp, ("{0:d}".format(trx_sys_doublewrite_magic_n)),
+    if trx_sys_doublewrite_magic_n == TRX_SYS_DOUBLEWRITE_MAGIC_N:
+        print >> report_fp, "# The doublewrite buffer has been created"
+    else:
+        print >> report_fp, "# The doublewrite buffer not created"
+    bin_fp.seek(offset + UNIV_PAGE_SIZE - 8)
+    print_fil_tailer(bin_fp, report_fp)
+
+trx_rseg_undo_slots = []
+def print_rollback_segment_header_page(bin_fp, report_fp):
+    offset = bin_fp.tell()
+    print_fil_header(bin_fp, report_fp)
+    print >> report_fp, "TRX_RSET_MAX_SIZE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_RSET_HISTORY_SIZE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_RSET_HISTORY (FLST_LEN):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "FLST_FIRST:",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "FLST_LAST:",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_RSEG_FSET_HEADER (FSEG_HDR_SPACE):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_RSEG_FSET_HEADER (FSEG_HDR_PAGE_NO):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_RSEG_FSET_HEADER (FSEG_HDR_OFFSET):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    cnt = 0
+    while cnt < TRX_RSEG_N_SLOTS:
+        page_no = mach_read_from_4(bin_fp)
+        print >> report_fp, "TRX_RSEG_UNDO_SLOTS[" + str(cnt) + "]:",
+        print >> report_fp, ("{0:d}".format(page_no))
+        if page_no != 0xFFFFFFFF:
+            trx_rseg_undo_slots.append(page_no)
+        cnt = cnt + 1
+    bin_fp.seek(offset + UNIV_PAGE_SIZE - 8)
+    print_fil_tailer(bin_fp, report_fp)
+
+next_undo_page_no = 0xFFFFFFFF
+next_undo_byte_offset = 0
+def print_undo_log_records(bin_fp, report_fp, offset, undo_log_offset, trx_undo_page_free):
+    cnt = 0
+    while undo_log_offset > 0 and undo_log_offset < trx_undo_page_free:
+        print >> report_fp, "UNDO LOG REC #" + str(cnt) + ":"
+        bin_fp.seek(offset + undo_log_offset)
+        print >> report_fp, "\tOFFSET TO NEXT UNDO REC:",
+        next_undo_log_offset = mach_read_from_2(bin_fp)
+        print >> report_fp, ("{0:d}".format(next_undo_log_offset))
+        undo_rec_type = mach_read_from_1(bin_fp)
+        if undo_rec_type == TRX_UNDO_INSERT_REC:
+            print >> report_fp, "\tINSERT UNDO REC TYPE:",
+        elif undo_rec_type == TRX_UNDO_UPD_EXIST_REC or undo_rec_type == TRX_UNDO_UPD_DEL_REC or undo_rec_type == TRX_UNDO_DEL_MARK_REC:
+            print >> report_fp, "\tUPDATE UNDO REC TYPE:",
+        else:
+            print >> report_fp, "\tUNKNOWN UNDO REC TYPE:",
+        print >> report_fp, ("{0:d}".format(undo_rec_type))
+        print >> report_fp, "\tUNDO REC NO:",
+        print >> report_fp, ("{0:d}".format(mach_read_from_1(bin_fp)))
+        print >> report_fp, "\tTABLE ID:",
+        print >> report_fp, ("{0:d}".format(mach_read_from_1(bin_fp)))
+        if undo_rec_type == TRX_UNDO_INSERT_REC:
+            primary_key_offset = bin_fp.tell() - offset
+            while primary_key_offset < next_undo_log_offset - 2:
+                print >> report_fp, "\tPRIMARY KEY LEN:",
+                primary_key_len = mach_read_from_1(bin_fp)
+                print >> report_fp, ("{0:d}".format(primary_key_len))
+                print >> report_fp, "\tPRIMARY KEY VAL:",
+                hex_print_from_n(bin_fp, report_fp, primary_key_len)
+                primary_key_offset = primary_key_offset + 1 + primary_key_len
+                bin_fp.seek(offset + primary_key_offset)
+            print >> report_fp, "\tOFFSET TO START:",
+            print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+        elif undo_rec_type == TRX_UNDO_UPD_EXIST_REC or undo_rec_type == TRX_UNDO_UPD_DEL_REC or undo_rec_type == TRX_UNDO_DEL_MARK_REC:
+            print >> report_fp, "\tINFO BITS:",
+            hex_print_from_n(bin_fp, report_fp, 1)
+            print >> report_fp, "\tDATA_TRX_ID:",
+            hex_print_from_n(bin_fp, report_fp, 6)
+            print >> report_fp, "\tDATA_ROLL_PTR:",
+            hex_print_from_n(bin_fp, report_fp, 7)
+            print >> report_fp, "\tPRIM_KEY/N_FIELDS/COL_ID/COL:",
+            xxx_offset = bin_fp.tell() - offset
+            hex_print_from_n(bin_fp, report_fp, next_undo_log_offset - xxx_offset - 2)
+            print >> report_fp, "\tOFFSET TO START:",
+            print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+        else:
+            break
+        undo_log_offset = next_undo_log_offset
+        cnt = cnt + 1
+
+def print_undo_log_segment_page(bin_fp, report_fp):
+    offset = bin_fp.tell()
+    print_fil_header(bin_fp, report_fp)
+    print >> report_fp, "TRX_UNDO_PAGE_TYPE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_START:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_FREE:",
+    trx_undo_page_free = mach_read_from_2(bin_fp)
+    print >> report_fp, ("{0:d}".format(trx_undo_page_free))
+    print >> report_fp, "TRX_UNDO_PAGE_NODE (FLST_PREV):",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_NODE (FLST_NEXT):",
+    next_undo_page_no = mach_read_from_4(bin_fp)
+    next_undo_byte_offset = mach_read_from_2(bin_fp)
+    print >> report_fp, ("({0:d} {1:d})".format(next_undo_page_no, next_undo_byte_offset))
+    print >> report_fp, "TRX_UNDO_STATE (TRX_UNDO_SEG_HDR):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_LAST_LOG:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_FSEG_HEADER (FSEG_HDR_SPACE):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_UNDO_FSEG_HEADER (FSEG_HDR_PAGE_NO):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_UNDO_FSEG_HEADER (FSEG_HDR_OFFSET):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_LIST (FLST_LEN):",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_LIST (FLST_FIRST):",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_LIST (FLST_LAST):",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_TRX_ID:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    print >> report_fp, "TRX_UNDO_TRX_NO:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    print >> report_fp, "TRX_UNDO_DEL_MARKS:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_LOG_START:",
+    undo_log_offset = mach_read_from_2(bin_fp)
+    print >> report_fp, ("{0:d}".format(undo_log_offset))
+    print >> report_fp, "TRX_UNDO_XID_EXISTS:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_1(bin_fp)))
+    print >> report_fp, "TRX_UNDO_DICT_TRANS:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_1(bin_fp)))
+    print >> report_fp, "TRX_UNDO_TABLE_ID:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    print >> report_fp, "TRX_UNDO_NEXT_LOG:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PREV_LOG:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_HISTORY_NODE (FLST_PREV):",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_HISTORY_NODE (FLST_NEXT):",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_XA_FORMAT:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_UNDO_XA_TRID_LEN:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_UNDO_XA_BQUAL_LEN:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "TRX_UNDO_XA_XID:",
+    hex_print_from_n(bin_fp, report_fp, XIDDATASIZE)
+    print_undo_log_records(bin_fp, report_fp, offset, undo_log_offset, trx_undo_page_free)
+    bin_fp.seek(offset + UNIV_PAGE_SIZE - 8)
+    print_fil_tailer(bin_fp, report_fp)
+
+def print_undo_log_normal_page(bin_fp, report_fp):
+    offset = bin_fp.tell()
+    print_fil_header(bin_fp, report_fp)
+    print >> report_fp, "TRX_UNDO_PAGE_TYPE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_START:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_FREE:",
+    trx_undo_page_free = mach_read_from_2(bin_fp)
+    print >> report_fp, ("{0:d}".format(trx_undo_page_free))
+    print >> report_fp, "TRX_UNDO_PAGE_NODE (FLST_PREV):",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_NODE (FLST_NEXT):",
+    next_undo_page_no = mach_read_from_4(bin_fp)
+    next_undo_byte_offset = mach_read_from_2(bin_fp)
+    print >> report_fp, ("({0:d} {1:d})".format(next_undo_page_no, next_undo_byte_offset))
+    undo_log_offset = bin_fp.tell() - offset
+    print_undo_log_records(bin_fp, report_fp, offset, undo_log_offset, trx_undo_page_free)
+    bin_fp.seek(offset + UNIV_PAGE_SIZE - 8)
+    print_fil_tailer(bin_fp, report_fp)
+
+# User input variables.
+if not len(sys.argv) == 2 and not len(sys.argv) == 3:
+    print "Usage: ./parsemysqlundo <data_dir> [, <out_dir>]"
+    sys.exit(1)
+
+data_dir = sys.argv[1]
+if os.path.isdir(data_dir):
+    data_dir = os.path.abspath(data_dir)
+    ibddata1 = os.path.join(data_dir, "idbdata1")
+    if not os.path.isfile(ibddata1):
+        print "Cound not find " + ibddata1
+        sys.exit(1)
+else:
+    print "Unknown data directory " + data_dir
+    sys.exit(1)
+
+if len(sys.argv) == 2:
+    out_dir = os.getcwd()
+else:
+    out_dir = sys.argv[2]
+    if os.path.isdir(out_dir):
+        out_dir = os.path.abspath(out_dir)
+    else:
+        print "Unknown output directory " + out_dir
+        sys.exit(1)
+report_file = os.path.join(out_dir, "undo.report")
+report_fp = open(report_file, 'w')
+
+# Open the InnoDB TRX SYSTEM PAGE
+with open(ibddata1, 'rb') as bin_fp:
+    bin_fp.seek(UNIV_PAGE_SIZE*FSP_TRX_SYS_PAGE_NO)
+    print >> report_fp, "--- TRX SYSTEM PAGE ---"
+    print_trx_system_page(bin_fp, report_fp)
+    idx = 0
+    print >> report_fp
+
+    while idx < TRX_SYS_N_RSEGS:
+        if not idx >= 1 or not idx <= 32:
+            # ignore rseg 1 to 32 (for temporary tables only)
+            if trx_sys_rsegs[idx][0] == 0:
+                print >> report_fp, "--- ROLLBACK SEGMENT HEADER PAGE #" + str(idx) + " (" + str(trx_sys_rsegs[idx][0]) + ", " + str(trx_sys_rsegs[idx][1]) + ") ---"
+                bin_fp.seek(UNIV_PAGE_SIZE*trx_sys_rsegs[idx][1])
+                print_rollback_segment_header_page(bin_fp, report_fp)
+                print >> report_fp
+
+                for hdr_page_no in trx_rseg_undo_slots:
+                    print >> report_fp, "--- UNDO LOG SEGMENT PAGE (" + str(trx_sys_rsegs[idx][0]) + ", " + str(hdr_page_no) + ") ---"
+                    bin_fp.seek(UNIV_PAGE_SIZE*hdr_page_no)
+                    print_undo_log_segment_page(bin_fp, report_fp)
+                    print >> report_fp
+
+                    while next_undo_page_no != 0xFFFFFFFF and next_undo_page_no != hdr_page_no:
+                        print >> report_fp, "--- UNDO LOG NORMAL PAGE (" + str(trx_sys_rsegs[idx][0]) + ", " + str(next_undo_page_no) + ") ---"
+                        bin_fp.seek(UNIV_PAGE_SIZE*next_undo_page_no)
+                        print_undo_log_normal_page(bin_fp, report_fp)
+                        print >> report_fp
+                del trx_rseg_undo_slots[:]
+        idx = idx + 1
+
+report_fp.close()
+print "Report generated, check " + report_file + " for details"
