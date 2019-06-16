@@ -1,0 +1,17 @@
+#!/usr/bin/python
+
+import sys
+import string
+
+if (len(sys.argv) != 2):
+    print "Usage: " + sys.argv[0] + " <str>"
+    sys.exit()
+
+input = sys.argv[1]
+output = ""
+
+for ch in list(input):
+    output += hex(ord(ch)).replace('0x', '').upper()
+    output += ' '
+
+print output
