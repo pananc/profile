@@ -1,0 +1,20 @@
+#!/usr/bin/python
+
+import sys
+import string
+
+PATH_SEPERATOR = "/"
+ESCAPE = "\\"
+
+if (len(sys.argv) != 2):
+    print "Usage: " + sys.argv[0] + " <path>"
+    sys.exit()
+
+output = ""
+
+items = string.split(sys.argv[1], PATH_SEPERATOR)
+for item in items:
+    if len(item) > 0:
+        output += ESCAPE + PATH_SEPERATOR + item
+
+print output
