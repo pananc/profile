@@ -1,0 +1,14 @@
+[user]
+        name = n00214098
+        email = nieyuanyuan@huawei.com
+[core]
+        gitproxy = /home/nieyy/Bin/proxy
+[alias]
+        lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative
+        lga = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative --all
+[push]
+        default = simple
+[gitreview]
+        username = n00214098
+[credential]
+        helper = cache --timeout=91104000
