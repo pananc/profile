@@ -1,0 +1,282 @@
+#!/usr/bin/python
+
+# This script is used to parse mysql ibd file.
+# Author: Nicole Nie (2017/11/24)
+#
+# Usage: ./parsemysqlibd <ibd_file> [, <out_dir>]
+#
+# Note:
+# 1. The ibd_file should be the path to the .ibd file
+# 2. The out_dir is current dir if not defined
+
+import os
+import struct
+import sys
+
+# Predefined constants.
+UNIV_PAGE_SIZE = 16384
+FIL_PAGE_DATA = 38
+PAGE_DATA = (FIL_PAGE_DATA + 36 + 2 * 10)
+FIL_PAGE_INDEX = 17855
+FIL_PAGE_UNDO_LOG = 2
+REC_N_NEW_EXTRA_BYTES = 5
+REC_N_OLD_EXTRA_BYTES = 6
+
+def mach_read_from_1(fp):
+    c0, = struct.unpack('B', fp.read(1))
+    return (c0)
+
+def mach_read_from_2(fp):
+    c0,c1 = struct.unpack('BB', fp.read(2))
+    return (c0<<8) + (c1)
+
+def mach_read_from_4(fp):
+    c0,c1,c2,c3 = struct.unpack('BBBB', fp.read(4))
+    # print ("{0:d} {1:d} {2:d} {3:d}".format(c0, c1, c2, c3)),
+    return (c0<<24) + (c1<<16) + (c2<<8) + (c3)
+
+def mach_read_from_8(fp):
+    c0,c1,c2,c3,c4,c5,c6,c7 = struct.unpack('BBBBBBBB', fp.read(8))
+    return (c0<<56) + (c1<<48) + (c2<<40) + (c3<<32) + (c4<<24) + (c5<<16) + (c6<<8) + (c7)
+
+def hex_print_from_n(bin_fp, report_fp, n):
+    cnt = 0
+    while cnt < n:
+        c, = struct.unpack('B', bin_fp.read(1))
+        print >> report_fp, ("{0:02X}".format(c)),
+        cnt = cnt + 1
+    print >> report_fp
+
+def print_fil_header(bin_fp, report_fp):
+    print >> report_fp, "FIL_PAGE_CHKSUM:",
+    hex_print_from_n(bin_fp, report_fp, 4)
+    print >> report_fp, "FIL_PAGE_OFFSET:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "FIL_PAGE_PREV:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "FIL_PAGE_NEXT:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    print >> report_fp, "FIL_PAGE_LSN:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    fil_page_type = mach_read_from_2(bin_fp)
+    print >> report_fp, "FIL_PAGE_TYPE:",
+    print >> report_fp, ("{0:d}".format(fil_page_type))
+    print >> report_fp, "FIL_PAGE_FILE_FLUSH_LSN:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    print >> report_fp, "FIL_PAGE_SPACE_ID:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_4(bin_fp)))
+    return fil_page_type
+
+def print_page_record(bin_fp, report_fp, rec_offset):
+    bin_fp.seek(rec_offset - 6)
+    base_offset = rec_offset & (16384-1)
+    print >> report_fp, "\t\tOFFSET:", str(base_offset)
+    print >> report_fp, "\t\tNULL BITS:",
+    null_bits = mach_read_from_1(bin_fp)
+    print >> report_fp, ("{0:08b}".format(null_bits))
+    info_bits = mach_read_from_1(bin_fp)
+    print >> report_fp, "\t\tINFO BITS (?|?|DELETED|MIN_REC):",
+    print >> report_fp, ("{0:04b}".format((null_bits>>4)))
+    print >> report_fp, "\t\tN_OWNED:",
+    print >> report_fp, ("{0:d}".format((null_bits & 15)))
+    rec_info = mach_read_from_2(bin_fp)
+    print >> report_fp, "\t\tHEAP_NO:",
+    heap_no = (rec_info>>3)
+    if heap_no == 0:
+        print >> report_fp, "0-PAGE_HEAP_NO_INFIMUM"
+    elif heap_no == 1:
+        print >> report_fp, "1-PAGE_HEAP_NO_SUPREMUM"
+    elif heap_no == 2:
+        print >> report_fp, "2-PAGE_HEAP_NO_USER_LOW"
+    else:
+        print >> report_fp, ("{0:d}".format(heap_no))
+    print >> report_fp, "\t\tRECORD_TYPE:",
+    rec_type = (rec_info & 7)
+    if rec_type == 0:
+        print >> report_fp, "000-Regular"
+    elif rec_type == 1:
+        print >> report_fp, "001-B+ Tree Node"
+    elif rec_type == 2:
+        print >> report_fp, "010-Infimum"
+    elif rec_type == 3:
+        print >> report_fp, "011-Supremum"
+    else:
+        print >> report_fp, "1xx-Reserved"
+    print >> report_fp, "\t\tNEXT OFFSET:",
+    incr_offset = mach_read_from_2(bin_fp)
+    if (base_offset + incr_offset) > UNIV_PAGE_SIZE:
+        print >> report_fp, ("{0:d}".format((base_offset + incr_offset) % UNIV_PAGE_SIZE))
+    else:
+        print >> report_fp, ("{0:d}".format((base_offset + incr_offset)))
+    if rec_type == 0 or rec_type == 1:
+        print >> report_fp, "\t\tRECORD CONTENT:",
+        if (base_offset + incr_offset) < UNIV_PAGE_SIZE:
+            if incr_offset < (256+6):
+                hex_print_from_n(bin_fp, report_fp, (incr_offset-6))
+            else:
+                hex_print_from_n(bin_fp, report_fp, 256)
+        else:
+            print >> report_fp, "..."
+
+def print_page_content(bin_fp, report_fp, init_offset):
+    print >> report_fp, "PAGE_N_DIR_SLOTS:",
+    page_n_dir_slots = mach_read_from_2(bin_fp)
+    print >> report_fp, ("{0:d}".format(page_n_dir_slots))
+    print >> report_fp, "PAGE_HEAP_TOP:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    page_n_heap = mach_read_from_2(bin_fp)
+    if (page_n_heap & 0x8000) == 0x8000:
+        page_n_heap = page_n_heap & ~0x8000
+        is_comp = True
+        print >> report_fp, "PAGE_N_HEAP (new-style compact format):",
+    else:
+        is_comp = False
+        print >> report_fp, "PAGE_N_HEAP (old-style redundant format):",
+    print >> report_fp, ("{0:d}".format(page_n_heap))
+    print >> report_fp, "PAGE_FREE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "PAGE_GARBAGE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "PAGE_LAST_INSERT:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "PAGE_DIRECTION:",
+    page_direction = mach_read_from_2(bin_fp)
+    if page_direction == 1:
+        print >> report_fp, "1-PAGE_LEFT"
+    elif page_direction == 2:
+        print >> report_fp, "2-PAGE_RIGHT"
+    elif page_direction == 3:
+        print >> report_fp, "3-PAGE_SAME_REC"
+    elif page_direction == 4:
+        print >> report_fp, "4-PAGE_SAME_PAGE"
+    elif page_direction == 5:
+        print >> report_fp, "5-PAGE_NO_DIRECTION"
+    else:
+        print >> report_fp, ("{0:d}-UNKNOWN".format(page_direction))
+    print >> report_fp, "PAGE_N_DIRECTION:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "PAGE_N_RECS:",
+    page_n_recs = mach_read_from_2(bin_fp)
+    print >> report_fp, ("{0:d}".format(page_n_recs))
+    print >> report_fp, "PAGE_MAX_TRX_ID:",
+    hex_print_from_n(bin_fp, report_fp, 8)
+    print >> report_fp, "PAGE_LEVEL:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "PAGE_INDEX_ID:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_8(bin_fp)))
+    if is_comp:
+        infimum = PAGE_DATA + 5
+        supremum = PAGE_DATA + 2*REC_N_NEW_EXTRA_BYTES + 8
+        record_extra_bytes = REC_N_NEW_EXTRA_BYTES
+        bin_fp.seek(init_offset + infimum - 2)
+        record_offset = infimum + mach_read_from_2(bin_fp)
+    else:
+        infimum = PAGE_DATA + 1  + REC_N_OLD_EXTRA_BYTES
+        supremum = PAGE_DATA + 2 + 2*REC_N_OLD_EXTRA_BYTES + 8
+        record_extra_bytes = REC_N_OLD_EXTRA_BYTES
+        bin_fp.seek(init_offset + infimum - 2)
+        record_offset = mach_read_from_2(bin_fp)
+    print >> report_fp, "REC OFFSETS:", str(page_n_recs), "EXPECTED"
+    print >> report_fp, "\tOFFSET TO INFIMUM:", str(infimum)
+    if is_comp:
+        print_page_record(bin_fp, report_fp, (init_offset + infimum))
+    print >> report_fp, "\tOFFSET TO SUPREMUM:", str(supremum)
+    if is_comp:
+        print_page_record(bin_fp, report_fp, (init_offset + supremum))
+    idx = 0
+    while (record_offset < UNIV_PAGE_SIZE - record_extra_bytes) and (record_offset != supremum):
+        print >> report_fp, "\tOFFSET TO REC #" + str(idx) + ":", str(record_offset)
+        if is_comp:
+            print_page_record(bin_fp, report_fp, (init_offset + record_offset))
+            bin_fp.seek(init_offset + record_offset - 2)
+            incr_offset = mach_read_from_2(bin_fp)
+            if incr_offset == 0:
+                print >> report_fp, "\t***FATAL ERROR DURING PARSING***"
+                break
+            record_offset = record_offset + incr_offset
+        else:
+            bin_fp.seek(init_offset + record_offset - 2)
+            next_offset = mach_read_from_2(bin_fp)
+            if (next_offset == 0) or (next_offset == record_offset):
+                print >> report_fp, "\t***FATAL ERROR DURING PARSING***"
+                break
+            record_offset = next_offset
+        if record_offset > UNIV_PAGE_SIZE:
+            record_offset = record_offset % UNIV_PAGE_SIZE
+        idx = idx + 1
+    return page_n_dir_slots
+
+def print_page_directory(bin_fp, report_fp, page_n_dir_slots):
+    cnt = 0
+    print >> report_fp, "PAGE_DIRECTORY:", str(page_n_dir_slots), "SLOTS"
+    while cnt < page_n_dir_slots:
+        print >> report_fp, "\tSLOT[" + str(cnt) + "]:",
+        print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+        bin_fp.seek(-4, 1)
+        cnt = cnt + 1
+
+def print_undo_log_header(bin_fp, report_fp):
+    print >> report_fp, "TRX_UNDO_PAGE_TYPE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_START:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_FREE:",
+    print >> report_fp, ("{0:d}".format(mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_NODE (FLST_PREV):",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+    print >> report_fp, "TRX_UNDO_PAGE_NODE (FLST_NEXT):",
+    print >> report_fp, ("({0:d} {1:d})".format(mach_read_from_4(bin_fp), mach_read_from_2(bin_fp)))
+
+def print_fil_tailer(bin_fp, report_fp):
+    print >> report_fp, "FIL_PAGE_END_LSN_OLD_CHKSUM:",
+    hex_print_from_n(bin_fp, report_fp, 8)
+
+def print_ibd_page(bin_fp, report_fp):
+    offset = bin_fp.tell()
+    fil_page_type = print_fil_header(bin_fp, report_fp)
+    if fil_page_type == FIL_PAGE_INDEX:
+        page_n_dir_slots = print_page_content(bin_fp, report_fp, offset)
+        bin_fp.seek(offset + UNIV_PAGE_SIZE - 10)
+        print_page_directory(bin_fp, report_fp, page_n_dir_slots)
+    elif fil_page_type == FIL_PAGE_UNDO_LOG:
+        print_undo_log_header(bin_fp, report_fp)
+    bin_fp.seek(offset + UNIV_PAGE_SIZE - 8)
+    print_fil_tailer(bin_fp, report_fp)
+
+# User input variables.
+if not len(sys.argv) == 2 and not len(sys.argv) == 3:
+    print "Usage: ./parsemysqlibd <ibd_file> [, <out_dir>]"
+    sys.exit(1)
+
+ibd_file = sys.argv[1]
+if os.path.isfile(ibd_file):
+    ibd_file = os.path.abspath(ibd_file)
+else:
+    print "Unknown ibd file " + ibd_file
+    sys.exit(1)
+
+if len(sys.argv) == 2:
+    out_dir = os.getcwd()
+else:
+    out_dir = sys.argv[2]
+    if os.path.isdir(out_dir):
+        out_dir = os.path.abspath(out_dir)
+    else:
+        print "Unknown output directory " + out_dir
+        sys.exit(1)
+report_file = os.path.join(out_dir, os.path.basename(ibd_file) + ".report")
+report_fp = open(report_file, 'w')
+
+with open(ibd_file, 'rb') as bin_fp:
+    bin_fp.seek(0, 2) # seek to the end of the file
+    num_pages = bin_fp.tell() / UNIV_PAGE_SIZE
+    idx = 0
+    while idx < num_pages:
+        bin_fp.seek(UNIV_PAGE_SIZE*idx)
+        print >> report_fp, "--- IBD PAGE #" + str(idx) + " ---"
+        print_ibd_page(bin_fp, report_fp)
+        print >> report_fp
+        idx = idx + 1
+
+report_fp.close()
+print "Report generated, check " + report_file + " for details"
