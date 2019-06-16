@@ -1,0 +1,51 @@
+#!/usr/bin/python
+
+# This script is used to parse hex string to binary data.
+# Author: Nicole Nie (2017/11/24)
+#
+# Usage: ./hexstr2bin <input_file> [, <out_dir>]
+#
+# Note:
+# 1. The input_file should be the file contains hex string
+# 2. The out_dir is current dir if not defined
+
+import os
+import struct
+import sys
+
+# User input variables.
+if not len(sys.argv) == 2 and not len(sys.argv) == 3:
+    print "Usage: ./hexstr2bin <input_file> [, <out_dir>]"
+    sys.exit(1)
+
+input_file = sys.argv[1]
+if os.path.isfile(input_file):
+    input_file = os.path.abspath(input_file)
+else:
+    print "Unknown input file " + input_file
+    sys.exit(1)
+
+if len(sys.argv) == 2:
+    out_dir = os.getcwd()
+else:
+    out_dir = sys.argv[2]
+    if os.path.isdir(out_dir):
+        out_dir = os.path.abspath(out_dir)
+    else:
+        print "Unknown output directory " + out_dir
+        sys.exit(1)
+bin_file = os.path.join(out_dir, os.path.basename(input_file) + ".bin")
+bin_fp = open(bin_file, 'wb')
+
+for line in open(input_file):
+    line = line.rstrip()
+    start = 0
+    while start < len(line):
+        hex_str = line[start:start+2]
+        hex_int = int(hex_str, 16)
+        parsedata = struct.pack('B', hex_int)
+        bin_fp.write(parsedata)
+        start = start + 2
+
+bin_fp.close()
+print "Report generated, check " + bin_file + " for details"
