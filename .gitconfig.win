@@ -1,0 +1,34 @@
+[filter "lfs"]
+        clean = git-lfs clean %f
+        smudge = git-lfs smudge %f
+        required = true
+[user]
+        name = Nicole Nie
+        email = nieyuanyuan@huawei.com
+[push]
+        default = simple
+[https]
+        proxy = https://n00214098:TAKE1!one@proxyhk.huawei.com:8080
+    sslVerify = false
+[http]
+        proxy = http://n00214098:TAKE1!one@proxyhk.huawei.com:8080
+    sslVerify = false
+
+[diff]
+        tool = bc4
+[difftool]
+        bc4 = trustExitCode
+[difftool]
+        prompt = true
+[difftool "bc4"]
+        cmd = \"C:/Program Files/Beyond Compare 4/BCompare.exe\" \"$LOCAL\" \"$REMOTE\"
+
+[merge]
+        tool = bc4
+[mergetool]
+        prompt = false
+[mergetool "bc4"]
+        cmd = \"C:/Program Files/Beyond Compare 4/BCompare.exe\" \"$LOCAL\" \"$REMOTE\" \"$BASE\" \"$MERGED\"
+[core]
+        autocrlf = false
+        compression = 0
