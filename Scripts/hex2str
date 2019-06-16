@@ -1,0 +1,31 @@
+#!/usr/bin/python
+
+import sys
+import string
+
+if (len(sys.argv) != 2):
+    print "Usage: " + sys.argv[0] + " <hex>"
+    sys.exit()
+
+input = sys.argv[1]
+output = ""
+
+items = string.split(sys.argv[1], ' ')
+for item in items:
+    val = 0
+    for ch in list(item):
+        if ord(ch) >= ord('0') and ord(ch) <= ord('9'):
+            unit = ord(ch) - ord('0')
+            val = val*16 + unit
+        elif ord(ch) >= ord('a') and ord(ch) <= ord('f'):
+            unit = ord(ch) - ord('a') + 10
+            val = val*16 + unit
+        elif ord(ch) >= ord('A') and ord(ch) <= ord('F'):
+            unit = ord(ch) - ord('A') + 10
+            val = val*16 + unit
+        else:
+            print "Hex character must be [0-9], [a-f] or [A-F]"
+            sys.exit()
+    output += chr(val)
+
+print output
