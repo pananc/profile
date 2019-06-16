@@ -1,0 +1,73 @@
+#!/usr/bin/python
+
+import os
+import string
+import socket
+import sys
+
+if (len(sys.argv) == 3):
+    containerfile = sys.argv[1]
+    pathname = sys.argv[2]
+else:
+    print "Usage: ./deploydocker <path_to_container_list> <path_to_file_or_dir>"
+    sys.exit(1)
+
+if (os.path.isfile(containerfile)):
+    containerfile = os.path.abspath(containerfile)
+else:
+    print "Unknown container file " + containerfile
+    sys.exit(1)
+
+cmd = "cat " + containerfile
+containers = os.popen(cmd).read()
+lines = string.split(containers, "\n")
+
+print "Current working directory is " + os.path.abspath(os.path.curdir)
+
+for line in lines:
+    items = string.split(line)
+    if len(items) != 3:
+        continue
+    
+    container_id = items[0]
+    username = items[1]
+    userhome = items[2]
+    
+    print "Deploy " + pathname + " to docker container id " + container_id
+    basename = os.path.basename(pathname)
+    fullname = os.path.abspath(pathname)
+    dst_fullname = fullname.replace(os.environ['HOME'], userhome)
+    dirname = os.path.dirname(fullname)
+    dst_dirname = dirname.replace(os.environ['HOME'], userhome)
+    if os.path.isfile(pathname):
+        cmd = "sudo docker cp "
+        cmd += fullname + " " + container_id + ":" + dst_dirname
+        os.system(cmd)
+
+        cmd = "sudo docker exec -it "
+        cmd += container_id + " sh -c 'chown " + username + ":" + username + " " + dst_fullname + "'"
+        os.system(cmd)
+    elif os.path.isdir(pathname):
+        cmd = "cd " + dirname + ";tar czf " + basename + ".tar.gz ./" + basename
+        os.system(cmd)
+            
+        cmd = "sudo docker cp "
+        cmd += fullname + ".tar.gz " + container_id + ":" + dst_dirname
+        os.system(cmd)
+
+        cmd = "sudo docker exec -it "
+        cmd += container_id + " sh -c 'cd " + dst_dirname + ";tar zxf " + basename + ".tar.gz'"
+        os.system(cmd)
+
+        cmd = "sudo docker exec -it "
+        cmd += container_id + " sh -c 'chown -R " + username + ":" + username + " " + dst_fullname + "'"
+        os.system(cmd)
+
+        cmd = "sudo docker exec -it "
+        cmd += container_id + " sh -c 'rm -f " + dst_fullname + ".tar.gz'"
+        os.system(cmd)
+
+        cmd = "rm -f " + fullname + ".tar.gz"
+        os.system(cmd)
+    else:
+        print "Unknown directory or file name " + pathname
