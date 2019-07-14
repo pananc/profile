@@ -344,12 +344,12 @@ function mysqlinit()
   echo "relay-log-info-repository=TABLE" >> $MYSQL_CONFIG
   echo "binlog-checksum=NONE" >> $MYSQL_CONFIG
   echo "innodb_log_group_home_dir=$MYSQL_LOGDIR" >> $MYSQL_CONFIG
-  echo "innodb_log_file_size=1G" >> $MYSQL_CONFIG
-  echo "innodb_data_file_path=idbdata1:2G:autoextend" >> $MYSQL_CONFIG
+  echo "innodb_log_file_size=512M" >> $MYSQL_CONFIG
+  echo "innodb_data_file_path=idbdata1:512M:autoextend" >> $MYSQL_CONFIG
   echo "innodb_io_capacity=6000" >> $MYSQL_CONFIG
   echo "innodb_io_capacity_max=10000" >> $MYSQL_CONFIG
   echo "innodb_file_per_table=1" >> $MYSQL_CONFIG
-  echo "innodb_buffer_pool_size=64G" >> $MYSQL_CONFIG
+  echo "innodb_buffer_pool_size=1G" >> $MYSQL_CONFIG
   echo "bind-address=0.0.0.0" >> $MYSQL_CONFIG
   #echo "skip-grant-tables" >> $MYSQL_CONFIG
   echo "port=$PORT" >> $MYSQL_CONFIG
