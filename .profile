@@ -38,12 +38,10 @@ export REPORTDIR=$HOME/Report
 
 # Set DB related environment variables
 export PGDATA=$DATADIR/pgdata
-export GAUSSDATA=$DATADIR/gsdata
 export CNDATA=$DATADIR/cndata
 export CNDATA2=$DATADIR/cndata2
 export DTDATA=$DATADIR/dtdata
 export PGPORT=8888
-export GAUSSPORT=8888
 export PNPORT=8887
 export CNPORT=8886
 export CNPORT2=8885
@@ -53,17 +51,8 @@ export CLUSTER_MIN_DYNPORT=5000
 export CLUSTER_MAX_DYNPORT=5200
 export COCKROACHPORT=30000
 
-# Set shortcut environment variables
-export PGSRCDIR=$HOME/Project/postgresql-9.4.0
-export PNSRCDIR=$HOME/Project/br_GAUSSDB_V200R003C00_Cluster_Dev/Code
-export GSSRCDIR=$HOME/Project/UndoSegmentMgmt/postgres
-#export GSSRCDIR=$HOME/Project/GaussDB/postgres
-export SSSRCDIR=$HOME/Project/br_GAUSSDB_V200R001_CCBKINGDEE/Code
-export SSI0SRCDIR=$HOME/Project/Lab_GAUSSDB_V200R001C00B011/GaussDB
-
 # Set PATH
 export PATH=$PATH:$HOME/postgres/bin
-export PATH=$PATH:$HOME/gaussdb/bin
 export PATH=$PATH:$HOME/Scripts
 export PATH=$HOME/mysql/bin:$PATH
 export PATH=$HOME/mysql/scripts:$PATH
@@ -88,11 +77,9 @@ export PATH=$PATH:$HOME/sysstat/bin
 export LD_LIBRARY_PATH=$HOME/mysql/lib:$LD_LIBRARY_PATH:$HOME/mysql/lib/plugin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/mysql-cluster/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/unixODBC/lib
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/gsqlODBC/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/psqlODBC/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/yaml/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/dsware/agent/lib
 
 # Set ODBC
 export ODBCINI=$HOME/unixODBC/etc/odbc.ini
@@ -106,17 +93,6 @@ export PATH=$HOME/go/bin:$PATH
 export PATH=$HOME/goproj/bin:$PATH
 export GOROOT=$HOME/go
 export GOPATH=$HOME/goproj
-
-# Set SEASTAR
-export SEASTAR=$HOME/ccproj/matrixstorage/lib/seastar
-
-# Set proxy
-#export http_proxy="http://n00214098:TAKE1!one@proxyhk.huawei.com:8080"
-#export https_proxy=$http_proxy
-#export no_proxy=.huawei.com
-unset http_proxy
-unset https_proxy
-unset no_proxy
 
 # Set aliases
 alias mymake='make -j 10; if [ $? = 0 ]; then make -j 10 install; fi'
