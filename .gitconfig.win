@@ -3,16 +3,10 @@
         smudge = git-lfs smudge %f
         required = true
 [user]
-        name = Nicole Nie
-        email = nieyuanyuan@huawei.com
+        name = nieyuanyuan
+        email = nieyuanyuan@bytedance.com
 [push]
         default = simple
-[https]
-        proxy = https://n00214098:TAKE1!one@proxyhk.huawei.com:8080
-    sslVerify = false
-[http]
-        proxy = http://n00214098:TAKE1!one@proxyhk.huawei.com:8080
-    sslVerify = false
 
 [diff]
         tool = bc4

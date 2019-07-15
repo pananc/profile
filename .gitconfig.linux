@@ -1,6 +1,6 @@
 [user]
-        name = n00214098
-        email = nieyuanyuan@huawei.com
+        name = nieyuanyuan
+        email = nieyuanyuan@bytedance.com
 [core]
         gitproxy = /home/nieyy/Bin/proxy
 [alias]
@@ -9,6 +9,6 @@
 [push]
         default = simple
 [gitreview]
-        username = n00214098
+        username = nieyuanyuan
 [credential]
         helper = cache --timeout=91104000
