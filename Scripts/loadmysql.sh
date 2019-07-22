@@ -513,9 +513,9 @@ function mysqlinitmasterslave()
   echo "socket=/tmp/mysql.socket.$USER.slave" >> $SLAVE_CONFIG
 
   echo $MYSQLDVER
-  if [ -z "$(echo $MYSQLDVER | grep 5.6)" ]; then
+  if [ -z "$(echo $MYSQLDVER | grep '5\.6')" ]; then
     echo "Initialize master data directory with password $MYSQL_PERF_DEFAULT_PASSWORD"
-    if [ -z "$(echo $MYSQLDVER | grep 5.7)" ]; then
+    if [ -z "$(echo $MYSQLDVER | grep '5\.7')" ]; then
       # MySQL 8.0
       mysqld --defaults-file=$MASTER_CONFIG --initialize --init-file=$CMDDIR/mysql8_init.sql --basedir=$MYSQL_BASEDIR --datadir=$MASTER_DATADIR
         else
@@ -524,7 +524,7 @@ function mysqlinitmasterslave()
     fi
     cat $MASTER_DATADIR/error.log
     echo "Initialize slave data directory with password $MYSQL_PERF_DEFAULT_PASSWORD"
-    if [ -z "$(echo $MYSQLDVER | grep 5.7)" ]; then
+    if [ -z "$(echo $MYSQLDVER | grep '5\.7')" ]; then
       # MySQL 8.0
       mysqld --defaults-file=$SLAVE_CONFIG --initialize --init-file=$CMDDIR/mysql8_init.sql --basedir=$MYSQL_BASEDIR --datadir=$SLAVE_DATADIR
     else
