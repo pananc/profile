@@ -6,3 +6,4 @@ source $HOME/Scripts/loadmysql.sh
 source $HOME/Scripts/loadperf.sh
 source $HOME/Scripts/loadpidstat.sh
 source $HOME/Scripts/loadsar.sh
+source $HOME/Scripts/loadbyte.sh
