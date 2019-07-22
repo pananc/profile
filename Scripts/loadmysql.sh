@@ -359,9 +359,9 @@ function mysqlinit()
   echo "socket=/tmp/mysql.socket.$USER" >> $MYSQL_CONFIG
 
   echo $MYSQLDVER
-  if [ -z "$(echo $MYSQLDVER | grep 5.6)" ]; then
+  if [ -z "$(echo $MYSQLDVER | grep '5\.6')" ]; then
     echo "Initialize data directory with password $MYSQL_PERF_DEFAULT_PASSWORD"
-    if [ -z "$(echo $MYSQLDVER | grep 5.7)" ]; then
+    if [ -z "$(echo $MYSQLDVER | grep '5\.7')" ]; then
       # MySQL 8.0
       mysqld --defaults-file=$MYSQL_CONFIG --initialize --init-file=$CMDDIR/mysql8_init.sql --basedir=$MYSQL_BASEDIR --datadir=$MYSQL_DATADIR
     else
