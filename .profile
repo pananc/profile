@@ -95,8 +95,10 @@ export GOROOT=$HOME/go
 export GOPATH=$HOME/goproj
 
 # Set aliases
-alias mymake='make -j 10; if [ $? = 0 ]; then make -j 10 install; fi'
-alias dtrace='/usr/sbin/dtrace'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias grep='grep --color=auto'
+alias ls='ls --color=auto'
 alias ll="IFS=$' '; ls -la"
 alias nload='$HOME/nload/bin/nload'
 alias htop='$HOME/htop/bin/htop'
