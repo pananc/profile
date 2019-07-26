@@ -954,3 +954,51 @@ define mysql_print_trx_list
     set $trx=(trx_t*)$trx.trx_list.next
   end
 end
+
+define log_block_get_hdr_no
+  set $c0=*(unsigned char*)((char*)$arg0)
+  set $c1=*(unsigned char*)((char*)$arg0+1)
+  set $c2=*(unsigned char*)((char*)$arg0+2)
+  set $c3=*(unsigned char*)((char*)$arg0+3)
+  printf "%u\n", ~0x80000000UL & ((unsigned int)$c0 << 24) + ((unsigned int)$c1 << 16) + ((unsigned int)$c2 << 8) + ((unsigned int)$c3)
+end
+
+define mysql_print_log_block
+  set $block=(char*)$arg0
+
+  set $block_number=$block
+  printf "LOG_BLOCK_HDR_NO: "
+  log_block_get_hdr_no $block_number
+
+  set $data_length=$block_number+4
+  printf "LOG_BLOCK_HDR_DATA_LEN: "
+  mach_read_from_2 $data_length
+
+  set $first_rec_offset=$data_length+2
+  printf "LOG_BLOCK_FIRST_REC_GROUP: "
+  mach_read_from_2 $first_rec_offset
+
+  set $checkpoint_no=$first_rec_offset+2
+  printf "LOG_BLOCK_CHECKPOINT_NO: "
+  mach_read_from_4 $checkpoint_no
+
+  set $block_checksum=$block+512-4
+  printf "LOG_BLOCK_CHECKSUM: "
+  hex_read_from_4 $block_checksum
+end
+
+define mysql_print_log_record
+  set $record=(char*)$arg0
+
+  set $mlog_type=$record
+  printf "MLOG_TYPE: "
+  mach_read_from_1 $mlog_type
+
+  set $mlog_space_id=$mlog_type+1
+  printf "MLOG_SPACE_ID: "
+  mach_read_from_4 $mlog_space_id
+
+  set $mlog_page_no=$mlog_space_id+4
+  printf "MLOG_PAGE_NO: "
+  mach_read_from_4 $mlog_page_no
+end
