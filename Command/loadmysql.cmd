@@ -1002,3 +1002,23 @@ define mysql_print_log_record
   printf "MLOG_PAGE_NO: "
   mach_read_from_4 $mlog_page_no
 end
+
+define mysql_print_buf_flush_list
+  set logging overwrite on
+  set logging file mysql_buf_flush_list.txt
+  set logging on
+
+  set pagination off
+  set $buf_pool=(buf_pool_t*)$arg0
+  set $item=$buf_pool->flush_list.end
+  while($item!=0x0)
+    printf "bpage %p\n", $item
+    print *((buf_page_t*)$item)
+    set $item=$item->list.prev
+  end
+  set pagination on
+
+  set logging off
+  set logging file gdb.txt
+  set logging overwrite off
+end
