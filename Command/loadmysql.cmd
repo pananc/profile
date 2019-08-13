@@ -602,39 +602,48 @@ end
 define mysql_print_recv_t
   set $recv=(recv_t*)$arg0
 
+  printf "Log record body length: "
+  printf "%u\n", $recv->len
+  printf "Start lsn of the log segment: "
+  printf "%lu\n", $recv->start_lsn
+  printf "End lsn of the log segment: "
+  printf "%lu\n", $recv->end_lsn
+
+  set $ptr=((char*)$recv->data) + sizeof(recv_data_t)
+  set $end_ptr=$ptr+$recv->len
+  # MLOG_COMP_REC_INSERT
+  if ($recv->type==38)
+    printf "This is a MLOG_COMP_REC_INSERT (%u) record\n", ($recv->type)
+    mysql_print_mlog_comp_rec_insert $ptr $end_ptr
+  else
+    # MLOG_COMP_REC_DELETE
+    if ($recv->type==42)
+      printf "This is a MLOG_COMP_REC_DELETE (%u) record\n", ($recv->type)
+      mysql_print_mlog_comp_rec_delete $ptr $end_ptr
+    else
+      printf "This is a MLOG_XXX (%u) record\n", ($recv->type)
+    end
+  end
+end
+
+define mysql_print_recv_addr_t
+  set $recv_addr=(recv_addr_t*)$arg0
+
   set logging overwrite on
-  set logging file mysql_recv_t.txt
+  set logging file mysql_recv_addr_t.txt
   set logging on
 
   set pagination off
+
+  printf "Space: "
+  printf "%u\n", $recv_addr->space
+  printf "Page no: "
+  printf "%u\n", $recv_addr->page_no
+
+  set $recv=(recv_t*)$recv_addr->rec_list.start
   set $cnt=0
   while (1)
-    printf "Log record body length: "
-    printf "%u\n", $recv->len
-    printf "Start lsn of the log segment: "
-    printf "%lu\n", $recv->start_lsn
-    printf "End lsn of the log segment: "
-    printf "%lu\n", $recv->end_lsn
-    printf "Space: "
-    printf "%u\n", $recv->space_id
-    printf "Page no: "
-    printf "%u\n", $recv->page_no
-
-    set $ptr=((char*)$recv->data) + sizeof(recv_data_t)
-    set $end_ptr=$ptr+$recv->len
-    # MLOG_COMP_REC_INSERT
-    if ($recv->type==38)
-      printf "This is a MLOG_COMP_REC_INSERT (%u) record\n", ($recv->type)
-      mysql_print_mlog_comp_rec_insert $ptr $end_ptr    
-    else
-      # MLOG_COMP_REC_DELETE
-      if ($recv->type==42)
-        printf "This is a MLOG_COMP_REC_DELETE (%u) record\n", ($recv->type)
-        mysql_print_mlog_comp_rec_delete $ptr $end_ptr
-      else
-        printf "This is a MLOG_XXX (%u) record\n", ($recv->type)
-      end
-    end
+    mysql_print_recv_t $recv
 
     set $recv=$recv->rec_list.next
     if ($recv==0x0)
