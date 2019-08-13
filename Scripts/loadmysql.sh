@@ -343,6 +343,10 @@ function mysqlinit()
   echo "master-info-repository=TABLE" >> $MYSQL_CONFIG
   echo "relay-log-info-repository=TABLE" >> $MYSQL_CONFIG
   echo "binlog-checksum=NONE" >> $MYSQL_CONFIG
+  if [ ! -z "$(echo $MYSQLDVER | grep 8.0)" ]; then
+    # Disable binlog for MySQL 8.0
+    echo "disable_log_bin" >> $MYSQL_CONFIG
+  fi
   echo "innodb_log_group_home_dir=$MYSQL_LOGDIR" >> $MYSQL_CONFIG
   echo "innodb_log_file_size=512M" >> $MYSQL_CONFIG
   echo "innodb_data_file_path=idbdata1:512M:autoextend" >> $MYSQL_CONFIG
