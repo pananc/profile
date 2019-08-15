@@ -349,7 +349,7 @@ function mysqlinit()
   fi
   echo "innodb_log_group_home_dir=$MYSQL_LOGDIR" >> $MYSQL_CONFIG
   echo "innodb_log_file_size=512M" >> $MYSQL_CONFIG
-  echo "innodb_data_file_path=idbdata1:512M:autoextend" >> $MYSQL_CONFIG
+  echo "innodb_data_file_path=ibdata1:512M:autoextend" >> $MYSQL_CONFIG
   echo "innodb_io_capacity=6000" >> $MYSQL_CONFIG
   echo "innodb_io_capacity_max=10000" >> $MYSQL_CONFIG
   echo "innodb_file_per_table=1" >> $MYSQL_CONFIG
@@ -462,7 +462,7 @@ function mysqlinitmasterslave()
   echo "binlog-checksum=NONE" >> $MASTER_CONFIG
   echo "innodb_log_group_home_dir=$MASTER_LOGDIR" >> $MASTER_CONFIG
   echo "innodb_log_file_size=1G" >> $MASTER_CONFIG
-  echo "innodb_data_file_path=idbdata1:2G:autoextend" >> $MASTER_CONFIG
+  echo "innodb_data_file_path=ibdata1:2G:autoextend" >> $MASTER_CONFIG
   echo "innodb_io_capacity=6000" >> $MASTER_CONFIG
   echo "innodb_io_capacity_max=10000" >> $MASTER_CONFIG
   echo "innodb_file_per_table=1" >> $MASTER_CONFIG
@@ -504,7 +504,7 @@ function mysqlinitmasterslave()
   echo "binlog-checksum=NONE" >> $SLAVE_CONFIG
   echo "innodb_log_group_home_dir=$SLAVE_LOGDIR" >> $SLAVE_CONFIG
   echo "innodb_log_file_size=1G" >> $SLAVE_CONFIG
-  echo "innodb_data_file_path=idbdata1:2G:autoextend" >> $SLAVE_CONFIG
+  echo "innodb_data_file_path=ibdata1:2G:autoextend" >> $SLAVE_CONFIG
   echo "innodb_io_capacity=6000" >> $SLAVE_CONFIG
   echo "innodb_io_capacity_max=10000" >> $SLAVE_CONFIG
   echo "innodb_file_per_table=1" >> $SLAVE_CONFIG
