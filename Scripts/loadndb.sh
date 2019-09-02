@@ -354,7 +354,9 @@ function mysqlinitprimaryreplica()
   echo "Initialize master data directory with password $NDB_PERF_DEFAULT_PASSWORD"
   mysqld --defaults-file=$PRIMARY_CONFIG --initialize --init-file=$CMDDIR/mysql8_init.sql --basedir=$NDB_BASEDIR --datadir=$PRIMARY_DATADIR
   # No need to initialize replica, just share data with primary.
-  ln -sf $PRIMARY_DATADIR $REPLICA_DATADIR
+  cp -R $PRIMARY_DATADIR $REPLICA_DATADIR
+  rm -rf $REPLICA_DATADIR/logstore
+  ln -sf $PRIMARY_DATADIR/logstore $REPLICA_DATADIR/logstore
 
   # Save configuration
   echo "$PRIMARY_DATADIR" > $CMDDIR/primary.cfg
