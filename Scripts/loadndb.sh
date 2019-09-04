@@ -175,11 +175,6 @@ function ndbinit()
     return
   fi
 
-  if [ ! -d $BASE_LOGDIR ]; then
-    echo "Unable to find base log directory $BASE_LOGDIR"
-    return
-  fi
-
   NDB_DATADIR=$BASE_DATADIR/ndb_data
   rm -rf $NDB_DATADIR
 
@@ -300,7 +295,7 @@ function ndbinitprimaryreplica()
   echo "innodb_io_capacity=6000" >> $PRIMARY_CONFIG
   echo "innodb_io_capacity_max=10000" >> $PRIMARY_CONFIG
   echo "innodb_file_per_table=1" >> $PRIMARY_CONFIG
-  echo "innodb_buffer_pool_size=64G" >> $PRIMARY_CONFIG
+  echo "innodb_buffer_pool_size=1G" >> $PRIMARY_CONFIG
   echo "bind-address=0.0.0.0" >> $PRIMARY_CONFIG
   echo "port=$PORT" >> $PRIMARY_CONFIG
   echo "socket=/tmp/ndb.socket.$USER.primary" >> $PRIMARY_CONFIG
@@ -337,13 +332,11 @@ function ndbinitprimaryreplica()
   # Disable binlog for ByteNDB
   echo "disable_log_bin" >> $REPLICA_CONFIG
   echo "innodb_replica_enabled=ON" >> $REPLICA_CONFIG
-  echo "innodb_log_group_home_dir=$SLAVE_LOGDIR" >> $REPLICA_CONFIG
-  echo "innodb_log_file_size=1G" >> $REPLICA_CONFIG
   echo "innodb_data_file_path=ibdata1:2G:autoextend" >> $REPLICA_CONFIG
   echo "innodb_io_capacity=6000" >> $REPLICA_CONFIG
   echo "innodb_io_capacity_max=10000" >> $REPLICA_CONFIG
   echo "innodb_file_per_table=1" >> $REPLICA_CONFIG
-  echo "innodb_buffer_pool_size=64G" >> $REPLICA_CONFIG
+  echo "innodb_buffer_pool_size=1G" >> $REPLICA_CONFIG
   echo "bind-address=0.0.0.0" >> $REPLICA_CONFIG
   echo "port=$PORT" >> $REPLICA_CONFIG
   echo "socket=/tmp/ndb.socket.$USER.replica" >> $REPLICA_CONFIG
