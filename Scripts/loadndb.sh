@@ -336,6 +336,7 @@ function mysqlinitprimaryreplica()
   echo "binlog-checksum=NONE" >> $REPLICA_CONFIG
   # Disable binlog for ByteNDB
   echo "disable_log_bin" >> $REPLICA_CONFIG
+  echo "innodb_replica_enabled=ON" >> $REPLICA_CONFIG
   echo "innodb_log_group_home_dir=$SLAVE_LOGDIR" >> $REPLICA_CONFIG
   echo "innodb_log_file_size=1G" >> $REPLICA_CONFIG
   echo "innodb_data_file_path=ibdata1:2G:autoextend" >> $REPLICA_CONFIG
