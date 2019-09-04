@@ -236,7 +236,7 @@ function ndbinit()
   echo "$NDB_DATADIR" > $CMDDIR/ndb.cfg
 }
 
-function mysqlinitprimaryreplica()
+function ndbinitprimaryreplica()
 {
   NDBPROC=`ps -ef | grep $USER | grep mysqld | grep -v safe | grep -v grep | awk '{print $2}'`
   if [ -z "$NDBPROC" ]; then
