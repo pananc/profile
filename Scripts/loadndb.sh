@@ -332,7 +332,7 @@ function ndbinitprimaryreplica()
   # Disable binlog for ByteNDB
   echo "disable_log_bin" >> $REPLICA_CONFIG
   echo "innodb_replica_enabled=ON" >> $REPLICA_CONFIG
-  echo "innodb_data_file_path=ibdata1:2G:autoextend" >> $REPLICA_CONFIG
+  echo "innodb_data_file_path=ibdata1:512M:autoextend" >> $REPLICA_CONFIG
   echo "innodb_io_capacity=6000" >> $REPLICA_CONFIG
   echo "innodb_io_capacity_max=10000" >> $REPLICA_CONFIG
   echo "innodb_file_per_table=1" >> $REPLICA_CONFIG
