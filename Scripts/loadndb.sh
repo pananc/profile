@@ -214,6 +214,7 @@ function ndbinit()
   echo "innodb_io_capacity_max=10000" >> $NDB_CONFIG
   echo "innodb_file_per_table=1" >> $NDB_CONFIG
   echo "innodb_buffer_pool_size=1G" >> $NDB_CONFIG
+  echo "innodb_mock_server_host=localhost:8080" >> $NDB_CONFIG
   echo "bind-address=0.0.0.0" >> $NDB_CONFIG
   #echo "skip-grant-tables" >> $NDB_CONFIG
   echo "port=$PORT" >> $NDB_CONFIG
@@ -296,6 +297,7 @@ function ndbinitprimaryreplica()
   echo "innodb_io_capacity_max=10000" >> $PRIMARY_CONFIG
   echo "innodb_file_per_table=1" >> $PRIMARY_CONFIG
   echo "innodb_buffer_pool_size=1G" >> $PRIMARY_CONFIG
+  echo "innodb_mock_server_host=localhost:8080" >> $PRIMARY_CONFIG
   echo "bind-address=0.0.0.0" >> $PRIMARY_CONFIG
   echo "port=$PORT" >> $PRIMARY_CONFIG
   echo "socket=/tmp/ndb.socket.$USER.primary" >> $PRIMARY_CONFIG
@@ -337,6 +339,7 @@ function ndbinitprimaryreplica()
   echo "innodb_io_capacity_max=10000" >> $REPLICA_CONFIG
   echo "innodb_file_per_table=1" >> $REPLICA_CONFIG
   echo "innodb_buffer_pool_size=1G" >> $REPLICA_CONFIG
+  echo "innodb_mock_server_host=localhost:8080" >> $REPLICA_CONFIG
   echo "bind-address=0.0.0.0" >> $REPLICA_CONFIG
   echo "port=$PORT" >> $REPLICA_CONFIG
   echo "socket=/tmp/ndb.socket.$USER.replica" >> $REPLICA_CONFIG
