@@ -1,10 +1,10 @@
 NDB_BASEDIR=$HOME/mysql
 NDB_CONFIG=$HOME/ndb.cnf
-PRIMARY_CONFIG=$HOME/ndb_primary.cnf
-REPLICA_CONFIG=$HOME/ndb_replica.cnf
-NDB_PERF_DEFAULT_TABLE_COUNT=250
-NDB_PERF_DEFAULT_TABLE_SIZE=25000
-NDB_PERF_DEFAULT_PASSWORD=TAKE0one
+NDB_PRIMARY_CONFIG=$HOME/ndb_primary.cnf
+NDB_REPLICA_CONFIG=$HOME/ndb_replica.cnf
+NDB_DEFAULT_TABLE_COUNT=250
+NDB_DEFAULT_TABLE_SIZE=25000
+NDB_DEFAULT_PASSWORD=TAKE0one
 
 function ndbstart()
 {
@@ -50,7 +50,7 @@ function ndbstart()
   fi
 }
 
-function mysqlstartprimaryreplica()
+function ndbstartprimaryreplica()
 {
   PRIMARY_DATADIR=$(cat $CMDDIR/primary.cfg | awk '{print $1}')
   if [ ! -d $PRIMARY_DATADIR/mysql ]; then
@@ -63,19 +63,19 @@ function mysqlstartprimaryreplica()
     return
   fi
 
-  if [ ! -f $PRIMARY_CONFIG ]; then
-    echo "Unable to find configuration file $PRIMARY_CONFIG"
+  if [ ! -f $NDB_PRIMARY_CONFIG ]; then
+    echo "Unable to find configuration file $NDB_PRIMARY_CONFIG"
     return
   fi
-  if [ ! -f $REPLICA_CONFIG ]; then
-    echo "Unable to find configuration file $REPLICA_CONFIG"
+  if [ ! -f $NDB_REPLICA_CONFIG ]; then
+    echo "Unable to find configuration file $NDB_REPLICA_CONFIG"
     return
   fi
 
   echo "Start ByteNDB primary server in normal mode"
-  mysqld --defaults-file=$PRIMARY_CONFIG --datadir=$PRIMARY_DATADIR --gdb > $PRIMARY_DATADIR/error.log 2>&1 &
+  mysqld --defaults-file=$NDB_PRIMARY_CONFIG --datadir=$PRIMARY_DATADIR --gdb > $PRIMARY_DATADIR/error.log 2>&1 &
   echo "Start ByteNDB replica server in normal mode"
-  mysqld --defaults-file=$REPLICA_CONFIG --datadir=$REPLICA_DATADIR --gdb > $REPLICA_DATADIR/error.log 2>&1 &
+  mysqld --defaults-file=$NDB_REPLICA_CONFIG --datadir=$REPLICA_DATADIR --gdb > $REPLICA_DATADIR/error.log 2>&1 &
 }
 
 function ndbstop()
@@ -85,22 +85,22 @@ function ndbstop()
     return
   fi
 
-  mysqladmin --defaults-file=$NDB_CONFIG --user=root --password=$NDB_PERF_DEFAULT_PASSWORD shutdown
+  mysqladmin --defaults-file=$NDB_CONFIG --user=root --password=$NDB_DEFAULT_PASSWORD shutdown
 }
 
 function ndbstopprimaryreplica()
 {
-  if [ ! -f $PRIMARY_CONFIG ]; then
-    echo "Unable to find configuration file $PRIMARY_CONFIG"
+  if [ ! -f $NDB_PRIMARY_CONFIG ]; then
+    echo "Unable to find configuration file $NDB_PRIMARY_CONFIG"
     return
   fi
-  if [ ! -f $REPLICA_CONFIG ]; then
-    echo "Unable to find configuration file $REPLICA_CONFIG"
+  if [ ! -f $NDB_REPLICA_CONFIG ]; then
+    echo "Unable to find configuration file $NDB_REPLICA_CONFIG"
     return
   fi
 
-  mysqladmin --defaults-file=$PRIMARY_CONFIG --user=root --password=$NDB_PERF_DEFAULT_PASSWORD shutdown
-  mysqladmin --defaults-file=$REPLICA_CONFIG --user=root --password=$NDB_PERF_DEFAULT_PASSWORD shutdown
+  mysqladmin --defaults-file=$NDB_PRIMARY_CONFIG --user=root --password=$NDB_DEFAULT_PASSWORD shutdown
+  mysqladmin --defaults-file=$NDB_REPLICA_CONFIG --user=root --password=$NDB_DEFAULT_PASSWORD shutdown
 }
 
 function ndbconnect()
@@ -115,7 +115,7 @@ function ndbconnect()
     return
   fi
 
-  mysql --defaults-file=$NDB_CONFIG --user=root --password=$NDB_PERF_DEFAULT_PASSWORD $DBNAME
+  mysql --defaults-file=$NDB_CONFIG --user=root --password=$NDB_DEFAULT_PASSWORD $DBNAME
 }
 
 function ndbconnectprimary()
@@ -125,12 +125,12 @@ function ndbconnectprimary()
     DBNAME=test
   fi
 
-  if [ ! -f $PRIMARY_CONFIG ]; then
-    echo "Unable to find configuration file $PRIMARY_CONFIG"
+  if [ ! -f $NDB_PRIMARY_CONFIG ]; then
+    echo "Unable to find configuration file $NDB_PRIMARY_CONFIG"
     return
   fi
 
-  mysql --defaults-file=$PRIMARY_CONFIG --user=root --password=$NDB_PERF_DEFAULT_PASSWORD $DBNAME
+  mysql --defaults-file=$NDB_PRIMARY_CONFIG --user=root --password=$NDB_DEFAULT_PASSWORD $DBNAME
 }
 
 function ndbconnectreplica()
@@ -140,12 +140,12 @@ function ndbconnectreplica()
     DBNAME=test
   fi
 
-  if [ ! -f $REPLICA_CONFIG ]; then
-    echo "Unable to find configuration file $REPLICA_CONFIG"
+  if [ ! -f $NDB_REPLICA_CONFIG ]; then
+    echo "Unable to find configuration file $NDB_REPLICA_CONFIG"
     return
   fi
 
-  mysql --defaults-file=$REPLICA_CONFIG --user=root --password=$NDB_PERF_DEFAULT_PASSWORD $DBNAME
+  mysql --defaults-file=$NDB_REPLICA_CONFIG --user=root --password=$NDB_DEFAULT_PASSWORD $DBNAME
 }
 
 function ndbinit()
@@ -224,7 +224,7 @@ function ndbinit()
   echo "socket=/tmp/ndb.socket.$USER" >> $NDB_CONFIG
 
   echo $MYSQLDVER
-  echo "Initialize data directory with password $NDB_PERF_DEFAULT_PASSWORD"
+  echo "Initialize data directory with password $NDB_DEFAULT_PASSWORD"
   mysqld --defaults-file=$NDB_CONFIG --initialize --init-file=$CMDDIR/mysql8_init.sql --basedir=$NDB_BASEDIR --datadir=$NDB_DATADIR
   cat $NDB_DATADIR/error.log
 
@@ -259,97 +259,97 @@ function ndbinitprimaryreplica()
   REPLICA_DATADIR=$BASE_DATADIR/replica_data
   rm -rf $REPLICA_DATADIR
 
-  rm -f $PRIMARY_CONFIG
-  cp $CMDDIR/mysql_perf.cnf $PRIMARY_CONFIG
-  rm -f $REPLICA_CONFIG
-  cp $CMDDIR/mysql_perf.cnf $REPLICA_CONFIG
+  rm -f $NDB_PRIMARY_CONFIG
+  cp $CMDDIR/mysql_perf.cnf $NDB_PRIMARY_CONFIG
+  rm -f $NDB_REPLICA_CONFIG
+  cp $CMDDIR/mysql_perf.cnf $NDB_REPLICA_CONFIG
 
   PORT=3600
   if [ ! -z "$(echo $MYSQLDVER | grep 5.6)" ]; then
-    sed -i '/secure-file-priv/d' $PRIMARY_CONFIG
+    sed -i '/secure-file-priv/d' $NDB_PRIMARY_CONFIG
   fi
-  sed -i '/innodb_file_per_table/d' $PRIMARY_CONFIG
-  sed -i '/innodb_buffer_pool_size/d' $PRIMARY_CONFIG
-  sed -i '/port/d' $PRIMARY_CONFIG
-  sed -i '/socket/d' $PRIMARY_CONFIG
-  sed -i '/skip-networking/d' $PRIMARY_CONFIG
-  sed -i '/performance_schema/d' $PRIMARY_CONFIG
-  sed -i '/thread_handling/d' $PRIMARY_CONFIG
-  sed -i '/innodb_log_file_size/d' $PRIMARY_CONFIG
-  sed -i '/innodb_io_capacity_max/d' $PRIMARY_CONFIG
-  sed -i '/innodb_io_capacity/d' $PRIMARY_CONFIG
-  echo "default-time-zone='+8:00'" >> $PRIMARY_CONFIG
-  echo "log-bin=mysql-bin" >> $PRIMARY_CONFIG
-  echo "sync_binlog=1" >> $PRIMARY_CONFIG
-  echo "server-id=1" >> $PRIMARY_CONFIG
-  echo "binlog-format=row" >> $PRIMARY_CONFIG
+  sed -i '/innodb_file_per_table/d' $NDB_PRIMARY_CONFIG
+  sed -i '/innodb_buffer_pool_size/d' $NDB_PRIMARY_CONFIG
+  sed -i '/port/d' $NDB_PRIMARY_CONFIG
+  sed -i '/socket/d' $NDB_PRIMARY_CONFIG
+  sed -i '/skip-networking/d' $NDB_PRIMARY_CONFIG
+  sed -i '/performance_schema/d' $NDB_PRIMARY_CONFIG
+  sed -i '/thread_handling/d' $NDB_PRIMARY_CONFIG
+  sed -i '/innodb_log_file_size/d' $NDB_PRIMARY_CONFIG
+  sed -i '/innodb_io_capacity_max/d' $NDB_PRIMARY_CONFIG
+  sed -i '/innodb_io_capacity/d' $NDB_PRIMARY_CONFIG
+  echo "default-time-zone='+8:00'" >> $NDB_PRIMARY_CONFIG
+  echo "log-bin=mysql-bin" >> $NDB_PRIMARY_CONFIG
+  echo "sync_binlog=1" >> $NDB_PRIMARY_CONFIG
+  echo "server-id=1" >> $NDB_PRIMARY_CONFIG
+  echo "binlog-format=row" >> $NDB_PRIMARY_CONFIG
   # Turn on GTID for ByteNDB
-  echo "gtid-mode=on" >> $PRIMARY_CONFIG
-  echo "enforce-gtid-consistency" >> $PRIMARY_CONFIG
-  echo "log-slave-updates" >> $PRIMARY_CONFIG
-  echo "master-info-repository=TABLE" >> $PRIMARY_CONFIG
-  echo "relay-log-info-repository=TABLE" >> $PRIMARY_CONFIG
-  echo "binlog-checksum=NONE" >> $PRIMARY_CONFIG
+  echo "gtid-mode=on" >> $NDB_PRIMARY_CONFIG
+  echo "enforce-gtid-consistency" >> $NDB_PRIMARY_CONFIG
+  echo "log-slave-updates" >> $NDB_PRIMARY_CONFIG
+  echo "master-info-repository=TABLE" >> $NDB_PRIMARY_CONFIG
+  echo "relay-log-info-repository=TABLE" >> $NDB_PRIMARY_CONFIG
+  echo "binlog-checksum=NONE" >> $NDB_PRIMARY_CONFIG
   # Disable binlog for ByteNDB
-  echo "disable_log_bin" >> $PRIMARY_CONFIG
-  echo "innodb_data_file_path=ibdata1:512M:autoextend" >> $PRIMARY_CONFIG
-  echo "innodb_io_capacity=6000" >> $PRIMARY_CONFIG
-  echo "innodb_io_capacity_max=10000" >> $PRIMARY_CONFIG
-  echo "innodb_file_per_table=1" >> $PRIMARY_CONFIG
-  echo "innodb_buffer_pool_size=1G" >> $PRIMARY_CONFIG
-  echo "innodb_mock_server_host=localhost:8080" >> $PRIMARY_CONFIG
-  echo "bind-address=0.0.0.0" >> $PRIMARY_CONFIG
-  echo "port=$PORT" >> $PRIMARY_CONFIG
-  echo "socket=/tmp/ndb.socket.$USER.primary" >> $PRIMARY_CONFIG
-  echo "[client]" >> $PRIMARY_CONFIG
-  echo "port=$PORT" >> $PRIMARY_CONFIG
-  echo "socket=/tmp/ndb.socket.$USER.primary" >> $PRIMARY_CONFIG
+  echo "disable_log_bin" >> $NDB_PRIMARY_CONFIG
+  echo "innodb_data_file_path=ibdata1:512M:autoextend" >> $NDB_PRIMARY_CONFIG
+  echo "innodb_io_capacity=6000" >> $NDB_PRIMARY_CONFIG
+  echo "innodb_io_capacity_max=10000" >> $NDB_PRIMARY_CONFIG
+  echo "innodb_file_per_table=1" >> $NDB_PRIMARY_CONFIG
+  echo "innodb_buffer_pool_size=1G" >> $NDB_PRIMARY_CONFIG
+  echo "innodb_mock_server_host=localhost:8080" >> $NDB_PRIMARY_CONFIG
+  echo "bind-address=0.0.0.0" >> $NDB_PRIMARY_CONFIG
+  echo "port=$PORT" >> $NDB_PRIMARY_CONFIG
+  echo "socket=/tmp/ndb.socket.$USER.primary" >> $NDB_PRIMARY_CONFIG
+  echo "[client]" >> $NDB_PRIMARY_CONFIG
+  echo "port=$PORT" >> $NDB_PRIMARY_CONFIG
+  echo "socket=/tmp/ndb.socket.$USER.primary" >> $NDB_PRIMARY_CONFIG
 
   PORT=$(( PORT+1 ))    # increments $PORT
   if [ ! -z "$(echo $MYSQLDVER | grep 5.6)" ]; then
-    sed -i '/secure-file-priv/d' $REPLICA_CONFIG
+    sed -i '/secure-file-priv/d' $NDB_REPLICA_CONFIG
   fi
-  sed -i '/innodb_file_per_table/d' $REPLICA_CONFIG
-  sed -i '/innodb_buffer_pool_size/d' $REPLICA_CONFIG
-  sed -i '/port/d' $REPLICA_CONFIG
-  sed -i '/socket/d' $REPLICA_CONFIG
-  sed -i '/skip-networking/d' $REPLICA_CONFIG
-  sed -i '/performance_schema/d' $REPLICA_CONFIG
-  sed -i '/thread_handling/d' $REPLICA_CONFIG
-  sed -i '/innodb_log_file_size/d' $REPLICA_CONFIG
-  sed -i '/innodb_io_capacity_max/d' $REPLICA_CONFIG
-  sed -i '/innodb_io_capacity/d' $REPLICA_CONFIG
-  echo "default-time-zone='+8:00'" >> $REPLICA_CONFIG
-  echo "log-bin=mysql-bin" >> $REPLICA_CONFIG
-  echo "sync_binlog=1" >> $REPLICA_CONFIG
-  echo "server-id=2" >> $REPLICA_CONFIG
-  echo "binlog-format=row" >> $REPLICA_CONFIG
+  sed -i '/innodb_file_per_table/d' $NDB_REPLICA_CONFIG
+  sed -i '/innodb_buffer_pool_size/d' $NDB_REPLICA_CONFIG
+  sed -i '/port/d' $NDB_REPLICA_CONFIG
+  sed -i '/socket/d' $NDB_REPLICA_CONFIG
+  sed -i '/skip-networking/d' $NDB_REPLICA_CONFIG
+  sed -i '/performance_schema/d' $NDB_REPLICA_CONFIG
+  sed -i '/thread_handling/d' $NDB_REPLICA_CONFIG
+  sed -i '/innodb_log_file_size/d' $NDB_REPLICA_CONFIG
+  sed -i '/innodb_io_capacity_max/d' $NDB_REPLICA_CONFIG
+  sed -i '/innodb_io_capacity/d' $NDB_REPLICA_CONFIG
+  echo "default-time-zone='+8:00'" >> $NDB_REPLICA_CONFIG
+  echo "log-bin=mysql-bin" >> $NDB_REPLICA_CONFIG
+  echo "sync_binlog=1" >> $NDB_REPLICA_CONFIG
+  echo "server-id=2" >> $NDB_REPLICA_CONFIG
+  echo "binlog-format=row" >> $NDB_REPLICA_CONFIG
   # Turn on GTID for ByteNDB
-  echo "gtid-mode=on" >> $REPLICA_CONFIG
-  echo "enforce-gtid-consistency" >> $REPLICA_CONFIG
-  echo "log-slave-updates" >> $REPLICA_CONFIG
-  echo "master-info-repository=TABLE" >> $REPLICA_CONFIG
-  echo "relay-log-info-repository=TABLE" >> $REPLICA_CONFIG
-  echo "binlog-checksum=NONE" >> $REPLICA_CONFIG
+  echo "gtid-mode=on" >> $NDB_REPLICA_CONFIG
+  echo "enforce-gtid-consistency" >> $NDB_REPLICA_CONFIG
+  echo "log-slave-updates" >> $NDB_REPLICA_CONFIG
+  echo "master-info-repository=TABLE" >> $NDB_REPLICA_CONFIG
+  echo "relay-log-info-repository=TABLE" >> $NDB_REPLICA_CONFIG
+  echo "binlog-checksum=NONE" >> $NDB_REPLICA_CONFIG
   # Disable binlog for ByteNDB
-  echo "disable_log_bin" >> $REPLICA_CONFIG
-  echo "replica-mode=on" >> $REPLICA_CONFIG
-  echo "innodb_data_file_path=ibdata1:512M:autoextend" >> $REPLICA_CONFIG
-  echo "innodb_io_capacity=6000" >> $REPLICA_CONFIG
-  echo "innodb_io_capacity_max=10000" >> $REPLICA_CONFIG
-  echo "innodb_file_per_table=1" >> $REPLICA_CONFIG
-  echo "innodb_buffer_pool_size=1G" >> $REPLICA_CONFIG
-  echo "innodb_mock_server_host=localhost:8080" >> $REPLICA_CONFIG
-  echo "bind-address=0.0.0.0" >> $REPLICA_CONFIG
-  echo "port=$PORT" >> $REPLICA_CONFIG
-  echo "socket=/tmp/ndb.socket.$USER.replica" >> $REPLICA_CONFIG
-  echo "[client]" >> $REPLICA_CONFIG
-  echo "port=$PORT" >> $REPLICA_CONFIG
-  echo "socket=/tmp/ndb.socket.$USER.replica" >> $REPLICA_CONFIG
+  echo "disable_log_bin" >> $NDB_REPLICA_CONFIG
+  echo "replica-mode=on" >> $NDB_REPLICA_CONFIG
+  echo "innodb_data_file_path=ibdata1:512M:autoextend" >> $NDB_REPLICA_CONFIG
+  echo "innodb_io_capacity=6000" >> $NDB_REPLICA_CONFIG
+  echo "innodb_io_capacity_max=10000" >> $NDB_REPLICA_CONFIG
+  echo "innodb_file_per_table=1" >> $NDB_REPLICA_CONFIG
+  echo "innodb_buffer_pool_size=1G" >> $NDB_REPLICA_CONFIG
+  echo "innodb_mock_server_host=localhost:8080" >> $NDB_REPLICA_CONFIG
+  echo "bind-address=0.0.0.0" >> $NDB_REPLICA_CONFIG
+  echo "port=$PORT" >> $NDB_REPLICA_CONFIG
+  echo "socket=/tmp/ndb.socket.$USER.replica" >> $NDB_REPLICA_CONFIG
+  echo "[client]" >> $NDB_REPLICA_CONFIG
+  echo "port=$PORT" >> $NDB_REPLICA_CONFIG
+  echo "socket=/tmp/ndb.socket.$USER.replica" >> $NDB_REPLICA_CONFIG
 
   echo $MYSQLDVER
-  echo "Initialize master data directory with password $NDB_PERF_DEFAULT_PASSWORD"
-  mysqld --defaults-file=$PRIMARY_CONFIG --initialize --init-file=$CMDDIR/mysql8_init.sql --basedir=$NDB_BASEDIR --datadir=$PRIMARY_DATADIR
+  echo "Initialize master data directory with password $NDB_DEFAULT_PASSWORD"
+  mysqld --defaults-file=$NDB_PRIMARY_CONFIG --initialize --init-file=$CMDDIR/mysql8_init.sql --basedir=$NDB_BASEDIR --datadir=$PRIMARY_DATADIR
   # No need to initialize replica, just share data with primary.
   cp -R $PRIMARY_DATADIR $REPLICA_DATADIR
 
@@ -373,7 +373,7 @@ function ndbattach()
 function ndbattachprimary()
 {
   MYSQLD=$NDB_BASEDIR/bin/mysqld
-  NDBPROC=$(ps -ef | grep $USER | grep mysqld | grep "$PRIMARY_CONFIG" | grep -v safe | grep -v grep | awk '{print $2}')
+  NDBPROC=$(ps -ef | grep $USER | grep mysqld | grep "$NDB_PRIMARY_CONFIG" | grep -v safe | grep -v grep | awk '{print $2}')
   if [ -z "$NDBPROC" ]; then
     echo "Can't find the master mysqld to be attached"
   else
@@ -384,7 +384,7 @@ function ndbattachprimary()
 function ndbattachreplica()
 {
   MYSQLD=$NDB_BASEDIR/bin/mysqld
-  NDBPROC=$(ps -ef | grep $USER | grep mysqld | grep "$REPLICA_CONFIG" | grep -v safe | grep -v grep | awk '{print $2}')
+  NDBPROC=$(ps -ef | grep $USER | grep mysqld | grep "$NDB_REPLICA_CONFIG" | grep -v safe | grep -v grep | awk '{print $2}')
   if [ -z "$NDBPROC" ]; then
     echo "Can't find the slave mysqld to be attached"
   else
@@ -408,7 +408,7 @@ function ndbprepare()
     DBHOST=$LOCALIP
   fi
 
-  sysbench --test=tests/db/parallel_prepare.lua --oltp_tables_count=$NDB_PERF_DEFAULT_TABLE_COUNT --mysql-db=$DBNAME --oltp-table-size=$NDB_PERF_DEFAULT_TABLE_SIZE --mysql-user=$DBUSER --mysql-password=$NDB_PERF_DEFAULT_PASSWORD --mysql-port=$DBPORT --mysql-host=$DBHOST --num-threads=$NDB_PERF_DEFAULT_TABLE_COUNT --report-interval=10 run
+  sysbench --test=tests/db/parallel_prepare.lua --oltp_tables_count=$NDB_DEFAULT_TABLE_COUNT --mysql-db=$DBNAME --oltp-table-size=$NDB_DEFAULT_TABLE_SIZE --mysql-user=$DBUSER --mysql-password=$NDB_DEFAULT_PASSWORD --mysql-port=$DBPORT --mysql-host=$DBHOST --num-threads=$NDB_DEFAULT_TABLE_COUNT --report-interval=10 run
 }
 
 function ndbrunwrite()
@@ -436,7 +436,7 @@ function ndbrunwrite()
     CONCURRENCY=100
   fi
 
-  sysbench --test=tests/db/oltp.lua --mysql-table-engine=innodb --oltp_tables_count=$NDB_PERF_DEFAULT_TABLE_COUNT --mysql-db=$DBNAME --oltp-table-size=$NDB_PERF_DEFAULT_TABLE_SIZE --mysql-user=$DBUSER --mysql-password=$NDB_PERF_DEFAULT_PASSWORD --mysql-port=$DBPORT --mysql-host=$DBHOST --rand-type=uniform --num-threads=$CONCURRENCY --max-requests=0 --rand-seed=42 --max-time=$DURATION --oltp-read-only=off --report-interval=10 --forced-shutdown=3 run
+  sysbench --test=tests/db/oltp.lua --mysql-table-engine=innodb --oltp_tables_count=$NDB_DEFAULT_TABLE_COUNT --mysql-db=$DBNAME --oltp-table-size=$NDB_DEFAULT_TABLE_SIZE --mysql-user=$DBUSER --mysql-password=$NDB_DEFAULT_PASSWORD --mysql-port=$DBPORT --mysql-host=$DBHOST --rand-type=uniform --num-threads=$CONCURRENCY --max-requests=0 --rand-seed=42 --max-time=$DURATION --oltp-read-only=off --report-interval=10 --forced-shutdown=3 run
 }
 
 function ndbrunread()
@@ -464,7 +464,7 @@ function ndbrunread()
     CONCURRENCY=100
   fi
 
-  sysbench --test=tests/db/oltp.lua --oltp_tables_count=$NDB_PERF_DEFAULT_TABLE_COUNT --mysql-db=$DBNAME --oltp-table-size=$NDB_PERF_DEFAULT_TABLE_SIZE --mysql-user=$DBUSER --mysql-password=$NDB_PERF_DEFAULT_PASSWORD --mysql-port=$DBPORT --mysql-host=$DBHOST --db-dirver=mysql --num-threads=$CONCURRENCY --max-requests=0 --oltp_simple_ranges=0 --oltp-distinct-ranges=0 --oltp-sum-ranges=0 --oltp-order-ranges=0 --rand-seed=42 --max-time=$DURATION --oltp-read-only=on --report-interval=10 --forced-shutdown=3 run
+  sysbench --test=tests/db/oltp.lua --oltp_tables_count=$NDB_DEFAULT_TABLE_COUNT --mysql-db=$DBNAME --oltp-table-size=$NDB_DEFAULT_TABLE_SIZE --mysql-user=$DBUSER --mysql-password=$NDB_DEFAULT_PASSWORD --mysql-port=$DBPORT --mysql-host=$DBHOST --db-dirver=mysql --num-threads=$CONCURRENCY --max-requests=0 --oltp_simple_ranges=0 --oltp-distinct-ranges=0 --oltp-sum-ranges=0 --oltp-order-ranges=0 --rand-seed=42 --max-time=$DURATION --oltp-read-only=on --report-interval=10 --forced-shutdown=3 run
 }
 
 function ndbrunpurewrite()
@@ -492,5 +492,5 @@ function ndbrunpurewrite()
     CONCURRENCY=100
   fi
 
-  sysbench --test=tests/db/oltp.lua --mysql-table-engine=innodb --oltp_tables_count=$NDB_PERF_DEFAULT_TABLE_COUNT --mysql-db=$DBNAME --oltp-table-size=$NDB_PERF_DEFAULT_TABLE_SIZE --mysql-user=$DBUSER --mysql-password=$NDB_PERF_DEFAULT_PASSWORD --mysql-port=$DBPORT --mysql-host=$DBHOST --rand-type=uniform --num-threads=$CONCURRENCY --max-requests=0 --max-requests=0 --oltp_simple_ranges=0 --oltp-distinct-ranges=0 --oltp-sum-ranges=0 --oltp-order-ranges=0 --oltp-point-selects=0 --rand-seed=42 --max-time=$DURATION --oltp-read-only=off --report-interval=10 --forced-shutdown=3 run
+  sysbench --test=tests/db/oltp.lua --mysql-table-engine=innodb --oltp_tables_count=$NDB_DEFAULT_TABLE_COUNT --mysql-db=$DBNAME --oltp-table-size=$NDB_DEFAULT_TABLE_SIZE --mysql-user=$DBUSER --mysql-password=$NDB_DEFAULT_PASSWORD --mysql-port=$DBPORT --mysql-host=$DBHOST --rand-type=uniform --num-threads=$CONCURRENCY --max-requests=0 --max-requests=0 --oltp_simple_ranges=0 --oltp-distinct-ranges=0 --oltp-sum-ranges=0 --oltp-order-ranges=0 --oltp-point-selects=0 --rand-seed=42 --max-time=$DURATION --oltp-read-only=off --report-interval=10 --forced-shutdown=3 run
 }
