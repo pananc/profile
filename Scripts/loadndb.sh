@@ -163,7 +163,6 @@ function ndbinit()
   else
     LOCALIP=$(hostname -i | awk '{print $1}')
   fi
-  SERVER_ID=$(echo $LOCALIP | awk -F'.' '{print $4}')
 
   BASE_DATADIR=$1
   if [ -z $1 ]; then
@@ -198,7 +197,7 @@ function ndbinit()
   echo "default-time-zone='+8:00'" >> $NDB_CONFIG
   echo "log-bin=mysql-bin" >> $NDB_CONFIG
   echo "sync_binlog=1" >> $NDB_CONFIG
-  echo "server-id=$SERVER_ID" >> $NDB_CONFIG
+  echo "server-id=1" >> $NDB_CONFIG
   echo "binlog-format=row" >> $NDB_CONFIG
   # Turn on GTID for ByteNDB
   echo "gtid-mode=on" >> $NDB_CONFIG

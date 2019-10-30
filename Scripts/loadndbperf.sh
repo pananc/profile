@@ -88,7 +88,6 @@ function ndbperfinit()
   else
     LOCALIP=$(hostname -i | awk '{print $1}')
   fi
-  SERVER_ID=$(echo $LOCALIP | awk -F'.' '{print $4}')
 
   BASE_DATADIR=$1
   if [ -z $1 ]; then
@@ -123,7 +122,7 @@ function ndbperfinit()
   echo "default-time-zone='+8:00'" >> $NDB_PERF_CONFIG
   echo "log-bin=mysql-bin" >> $NDB_PERF_CONFIG
   echo "sync_binlog=1" >> $NDB_PERF_CONFIG
-  echo "server-id=$SERVER_ID" >> $NDB_PERF_CONFIG
+  echo "server-id=1" >> $NDB_PERF_CONFIG
   echo "binlog-format=row" >> $NDB_PERF_CONFIG
   # Turn on GTID for ByteNDB
   echo "gtid-mode=on" >> $NDB_PERF_CONFIG
